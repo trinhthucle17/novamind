@@ -1,0 +1,9 @@
+.env
+hubspot.config.yml
+venv/
+__pycache__/
+*.pyc
+*.db
+.DS_Store
+data/content/
+data/campaigns/

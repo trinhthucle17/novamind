@@ -1,0 +1,107 @@
+[
+  {
+    "email": "maya.chen@freelancedesign.co",
+    "first_name": "Maya",
+    "last_name": "Chen",
+    "persona": "creative_professionals",
+    "company": "Maya Chen Design"
+  },
+  {
+    "email": "jordan.rivers@pixelcraft.io",
+    "first_name": "Jordan",
+    "last_name": "Rivers",
+    "persona": "creative_professionals",
+    "company": "PixelCraft Studio"
+  },
+  {
+    "email": "sophie.nakamura@writewell.com",
+    "first_name": "Sophie",
+    "last_name": "Nakamura",
+    "persona": "creative_professionals",
+    "company": "WriteWell Content"
+  },
+  {
+    "email": "alex.foster@creativelens.co",
+    "first_name": "Alex",
+    "last_name": "Foster",
+    "persona": "creative_professionals",
+    "company": "Creative Lens Media"
+  },
+  {
+    "email": "nina.patel@artflow.studio",
+    "first_name": "Nina",
+    "last_name": "Patel",
+    "persona": "creative_professionals",
+    "company": "ArtFlow Studio"
+  },
+  {
+    "email": "jordan.ellis@brandthread.co",
+    "first_name": "Jordan",
+    "last_name": "Ellis",
+    "persona": "brand_strategists",
+    "company": "BrandThread Agency"
+  },
+  {
+    "email": "rachel.kim@insightlayer.io",
+    "first_name": "Rachel",
+    "last_name": "Kim",
+    "persona": "brand_strategists",
+    "company": "InsightLayer"
+  },
+  {
+    "email": "marcus.johnson@narrativeco.com",
+    "first_name": "Marcus",
+    "last_name": "Johnson",
+    "persona": "brand_strategists",
+    "company": "Narrative & Co."
+  },
+  {
+    "email": "priya.sharma@clearstory.agency",
+    "first_name": "Priya",
+    "last_name": "Sharma",
+    "persona": "brand_strategists",
+    "company": "ClearStory Agency"
+  },
+  {
+    "email": "derek.wong@frameworkstudio.co",
+    "first_name": "Derek",
+    "last_name": "Wong",
+    "persona": "brand_strategists",
+    "company": "Framework Studio"
+  },
+  {
+    "email": "sam.rivera@redlinegroup.io",
+    "first_name": "Sam",
+    "last_name": "Rivera",
+    "persona": "account_managers",
+    "company": "Redline Group"
+  },
+  {
+    "email": "lisa.martinez@brightagency.com",
+    "first_name": "Lisa",
+    "last_name": "Martinez",
+    "persona": "account_managers",
+    "company": "Bright Agency"
+  },
+  {
+    "email": "emma.davis@scalehaus.co",
+    "first_name": "Emma",
+    "last_name": "Davis",
+    "persona": "account_managers",
+    "company": "ScaleHaus"
+  },
+  {
+    "email": "carlos.gutierrez@multiflow.agency",
+    "first_name": "Carlos",
+    "last_name": "Gutierrez",
+    "persona": "account_managers",
+    "company": "MultiFlow Agency"
+  },
+  {
+    "email": "diana.woods@amplify.agency",
+    "first_name": "Diana",
+    "last_name": "Woods",
+    "persona": "account_managers",
+    "company": "Amplify Agency"
+  }
+]
