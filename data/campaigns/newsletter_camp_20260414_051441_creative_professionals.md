@@ -11,7 +11,7 @@ You got into creative work because you love the *craft*, turning a blank canvas 
 
 That's **9-12 hours of your week** going to admin, file management, and revision logistics.
 
-We wrote about what those hours could look like if you got them back. Not more productivity hacks. Not "work smarter." Just fewer hours spent on the busywork that sits between you and the creative work that actually connects with audiences.
+We wrote about what those hours could look like if you got them back—and why **human-in-the-loop** matters: client-facing work stays under your team's review so originality and fact-checking stay in your hands. NovaMind is building that as **one integrated AI & automations** layer, so you're not stacking tools on tools.
 
 [Read **The Agency Work-Life Balance Myth (and the 20+ Hours of AI Automation That Could Make It Real)** →](#)
 
