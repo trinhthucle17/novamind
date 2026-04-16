@@ -252,14 +252,16 @@ with st.sidebar:
 
     nav_pages = [
         "Overview",
-        "Campaign Generation",
+        "Content Generation",
         "Campaigns",
         "Analytics",
         "Contacts",
     ]
     requested_page = st.query_params.get("page", "Overview")
     if requested_page == "Run Pipeline":
-        requested_page = "Campaign Generation"
+        requested_page = "Content Generation"
+    if requested_page == "Campaign Generation":
+        requested_page = "Content Generation"
     if requested_page not in nav_pages:
         requested_page = "Overview"
 
@@ -270,7 +272,7 @@ with st.sidebar:
         label_visibility="collapsed",
         format_func=lambda x: {
             "Overview": "📊  Overview",
-            "Campaign Generation": "🚀  Campaign Generation",
+            "Content Generation": "🚀  Content Generation",
             "Campaigns": "📄  Campaigns",
             "Analytics": "📈  Analytics",
             "Contacts": "👥  Contacts",
@@ -749,7 +751,7 @@ def page_campaigns():
     st.caption("Browse all campaigns and their generated content")
 
     if not campaigns:
-        st.info("No campaigns yet. Go to **Campaign Generation** to create your first one!")
+        st.info("No campaigns yet. Go to **Content Generation** to create your first one!")
         return
 
     # Campaign selector
@@ -881,13 +883,27 @@ def page_analytics():
                     marker_color="#f5576c", marker_cornerradius=6,
                 ))
                 fig.update_layout(
-                    barmode="group", height=380,
-                    title="Engagement by Persona",
-                    margin=dict(l=20, r=20, t=50, b=40),
+                    barmode="group",
+                    height=440,
+                    title=dict(
+                        text="Engagement by Persona",
+                        x=0.02,
+                        xanchor="left",
+                        y=0.98,
+                        yanchor="top",
+                        font=dict(size=15),
+                    ),
+                    margin=dict(l=20, r=20, t=56, b=96),
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
                     font=dict(family="Inter, sans-serif", size=12),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="top",
+                        y=-0.32,
+                        xanchor="center",
+                        x=0.5,
+                    ),
                     yaxis=dict(gridcolor="#f0f0f5"),
                 )
                 st.plotly_chart(fig, use_container_width=True)
@@ -1035,10 +1051,10 @@ def page_contacts():
             st.markdown(_persona_chip(c.get("persona", "")), unsafe_allow_html=True)
 
 
-# ── Page: Campaign Generation ───────────────────────────────────────────────
+# ── Page: Content Generation ───────────────────────────────────────────────
 
 def page_run_pipeline():
-    st.title("Campaign Generation")
+    st.title("Content Generation")
     st.caption("Human-in-the-loop workflow: generate draft, review/edit, then approve and send")
 
     col_left, col_right = st.columns([3, 2])
@@ -1176,11 +1192,16 @@ def page_run_pipeline():
             st.divider()
 
         st.markdown("### Suggested Topics")
-        h1, h2 = st.columns([4, 1])
+        h1, h2 = st.columns(2)
         with h1:
             st.caption("LLM picks new angles from engagement + past topics (cached ~10 min).")
         with h2:
-            if st.button("Refresh", key="topic_recs_refresh", help="Clear cache and run the model again"):
+            if st.button(
+                "Refresh",
+                key="topic_recs_refresh",
+                help="Clear cache and run the model again",
+                use_container_width=True,
+            ):
                 _cached_topic_recommendations.clear()
                 st.rerun()
         _ck = engagement_cache_key()
@@ -1223,5 +1244,5 @@ elif page == "Analytics":
     page_analytics()
 elif page == "Contacts":
     page_contacts()
-elif page == "Campaign Generation":
+elif page == "Content Generation":
     page_run_pipeline()
