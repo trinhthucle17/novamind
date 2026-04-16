@@ -1,0 +1,39 @@
+---
+description: Newsletter personalization rules — all newsletters must use [First Name] placeholder
+globs: pipeline/content_generator.py,pipeline/orchestrator.py,data/**/*.md
+alwaysApply: false
+---
+
+# Newsletter Personalization
+
+All newsletter content MUST follow this personalization pattern:
+
+## Greeting Rule
+
+- **In .md files and database**: Use `[First Name]` as the placeholder
+  - Example: `Hey [First Name],` or `Hello [First Name],`
+- **In HubSpot emails**: Replace `[First Name]` with the HubSpot merge token `{{ contact.firstname }}`
+- **NEVER** use the persona group name as the greeting (e.g., "Hello Brand Strategists" is wrong)
+- **NEVER** hardcode a specific person's name in the template
+
+## Flow
+
+1. LLM generates newsletter body with `[First Name]` placeholder
+2. `.md` files are saved with `[First Name]` intact (for dashboard display)
+3. Database stores the body with `[First Name]` intact
+4. When creating HubSpot marketing emails, replace `[First Name]` → `{{ contact.firstname }}`
+
+## Example
+
+```markdown
+Hey [First Name],
+
+You became an account manager because you're great with *people*...
+```
+
+Becomes in HubSpot HTML:
+
+```html
+<p>Hey {{ contact.firstname }},</p>
+<p>You became an account manager because you're great with <em>people</em>...</p>
+```

@@ -24,6 +24,25 @@ class PersonaMetrics(BaseModel):
         return round(self.unsubscribes / max(self.recipients, 1) * 100, 2)
 
 
+class HubSpotEmailStats(BaseModel):
+    """Real performance data fetched from HubSpot's Marketing Email Statistics API."""
+    campaign_id: str
+    hubspot_email_id: str
+    persona_id: str
+    persona_name: str = ""
+    sent: int = 0
+    delivered: int = 0
+    opens: int = 0
+    clicks: int = 0
+    unsubscribes: int = 0
+    bounces: int = 0
+    open_rate: float = 0.0
+    click_rate: float = 0.0
+    unsubscribe_rate: float = 0.0
+    bounce_rate: float = 0.0
+    fetched_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+
 class CampaignMetrics(BaseModel):
     campaign_id: str
     blog_title: str = ""

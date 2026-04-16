@@ -133,8 +133,8 @@ def process_blog(filepath: str) -> dict:
     synced = sync_all_contacts()
     print(f"    Contacts synced: {synced}")
 
-    # Step 3: Distribute + log to CRM
-    print("\n  [3/4] Distributing newsletters and logging to CRM...")
+    # Step 3: Distribute (simulated send); CRM log runs after HubSpot emails in step 4
+    print("\n  [3/4] Distributing newsletters...")
     send_results = send_newsletters(campaign_id, blog.title, newsletters)
     print(f"    Emails sent: {send_results['total_sent']}")
 
@@ -160,6 +160,25 @@ def process_blog(filepath: str) -> dict:
             print(f"    [{nl.persona_name}] HubSpot email ID: {hs_id}")
         else:
             print(f"    [{nl.persona_name}] Error creating HubSpot email")
+
+    newsletters_for_crm = [
+        {
+            "persona": nl.persona_id,
+            "subject_line": nl.subject_line,
+            "hubspot_email_id": e["hubspot_email_id"],
+        }
+        for nl, e in zip(newsletters, hubspot_emails)
+    ]
+    crm_result = log_campaign_to_crm(
+        campaign_id,
+        blog.title,
+        send_results["send_date"],
+        newsletters=newsletters_for_crm,
+    )
+    if "error" in crm_result:
+        print(f"    [CRM] Campaign note failed: {crm_result.get('error', crm_result)}")
+    else:
+        print("    [CRM] Campaign logged to HubSpot (blog title, send date, newsletter IDs).")
 
     # Save campaign record
     campaign_dict = {

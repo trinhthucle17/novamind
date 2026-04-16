@@ -1,0 +1,43 @@
+---
+description: Voice, structure, and personalization standards for NovaMind blog posts and newsletters targeting creative agency professionals. Apply when generating or editing blog content, newsletter copy, or content prompts in the pipeline.
+globs: pipeline/content_generator.py,data/campaigns/**/*.md,data/content/**/*.md
+alwaysApply: false
+---
+
+# Agency Content Voice & Structure
+
+When generating blog posts or newsletters, read and follow the agency-blog-writer skill at `.cursor/skills/agency-blog-writer/SKILL.md`.
+
+## Audience
+
+Creative agency professionals (account managers, brand strategists, designers, project managers, copywriters). They are smart, time-poor, and creative — not corporate drones. They get pitched AI tools constantly. Connect before you sell.
+
+## Blog Post Rules
+
+1. **Hook first** — open with an industry in-joke or relatable "that's me" moment, not a definition or stats dump.
+2. **Show the pain (briefly)** — name where their time goes with real numbers. Don't dwell; they already live it.
+3. **Present the solution** — what AI handles for them and a concrete time-savings estimate.
+4. **Unlock the upside** — what high-value work they can reclaim (strategy, creative, leaving on time).
+5. **Close with reassurance** — AI is a smart intern, not a replacement.
+6. **Add one interactive element** — a short quiz, a "which type are you" selector, or a quick poll. A wall of text loses agency people.
+7. **Include one topic-based visual** — every generated blog should include an AI-generated hero image tied to the campaign topic.
+
+## Newsletter Rules
+
+- Personalized per persona: reference their specific role, metrics they care about, and daily friction points.
+- Greeting: always use `[First Name]` placeholder (never the persona group name).
+- Length: 150–250 words — concise and inviting, CTA drives them to the blog.
+- Subject line: under 60 characters, conversational, curiosity-driven.
+- Tone matches persona (see persona configs in `config.py`).
+
+## Tone Principles
+
+- Friendly, empathetic, creative, and informative.
+- Stats and data ground the claims — use them.
+- Never sound robotic or purely promotional. Connect first, sell second.
+- Read your own draft as if you're an agency professional. Would you keep reading?
+
+## Content Generator Integration
+
+The `generate_blog_post` and `generate_newsletters` functions in `pipeline/content_generator.py` must embed these guidelines in their system prompts. The agency-blog-writer skill defines the full prompt templates to use.
+

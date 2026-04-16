@@ -211,6 +211,49 @@ Ran the analytics pipeline for `camp_20260414_051441`:
 
 ---
 
+## April 16 — Real HubSpot Newsletter Performance Tracking
+
+### What Changed
+
+Replaced simulated engagement metrics with **real performance data** fetched from HubSpot's Marketing Email Statistics API (`/marketing/emails/2026-03/statistics/list`). Data is stored in SQLite for historical comparison across fetches.
+
+### New CLI Commands
+
+```
+python main.py --stats camp_20260414_051441              # Fetch + display stats
+python main.py --stats camp_20260414_051441 --history    # Include historical snapshots
+```
+
+### HubSpot Performance Data (Real — Fetched April 16)
+
+| Segment | Sent | Delivered | Opens | Open Rate | Click Rate | Unsub Rate | Bounce Rate |
+|---------|:----:|:---------:|:-----:|:---------:|:----------:|:----------:|:-----------:|
+| Creative Professionals | 4 | 1 | 0 | 0.0% | 0.0% | 0.0% | 75.0% |
+| Brand Strategists | 1 | 0 | 0 | 0.0% | 0.0% | 0.0% | 100.0% |
+| Account Managers | 1 | 1 | 1 | 100.0% | 0.0% | 0.0% | 0.0% |
+| **Overall** | **6** | **2** | **1** | **16.7%** | **0.0%** | **0.0%** | **66.7%** |
+
+### How It Works
+
+1. Reads HubSpot marketing email IDs from the campaign JSON (`data/campaigns/campaign_*.json`)
+2. Calls HubSpot's Statistics API for each email to get counters (sent, opens, clicks, bounces, unsubscribes) and ratios
+3. Stores each fetch as a timestamped snapshot in the `hubspot_email_stats` SQLite table
+4. Running `--stats` again creates a new snapshot, so you can track how open/click rates evolve over time
+5. The `--history` flag shows all historical snapshots side-by-side for trend analysis
+
+### Files Added/Modified
+
+| File | Change |
+|------|--------|
+| `models/metrics.py` | Added `HubSpotEmailStats` model |
+| `storage/database.py` | Added `hubspot_email_stats` table, `save_hubspot_stats()`, `get_hubspot_stats()`, `get_hubspot_stats_latest()` |
+| `pipeline/crm_manager.py` | Added `fetch_email_statistics()` — calls HubSpot Statistics API per email |
+| `pipeline/analytics.py` | Added `fetch_hubspot_metrics()`, `print_hubspot_stats()`, `show_historical_comparison()` |
+| `main.py` | Added `--stats` and `--history` CLI flags |
+| `data/campaigns/campaign_camp_20260414_051441.json` | Updated `hubspot_emails` with correct sent email IDs |
+
+---
+
 ## What's Left To Do
 
 - [ ] Launch and test the Streamlit dashboard (`streamlit run dashboard.py`)

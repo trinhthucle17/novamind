@@ -156,13 +156,21 @@ def log_campaign_to_crm(
     send_date: str,
     newsletters: list[dict] | None = None,
 ) -> dict:
-    """Log a campaign as a note in HubSpot, associated with all contacts."""
+    """Log a campaign as a note in HubSpot, associated with all contacts.
+
+    Each newsletter dict may include: persona (or persona_id), subject_line,
+    and hubspot_email_id (HubSpot marketing email object ID after creation).
+    """
     newsletter_lines = ""
     if newsletters:
         for i, nl in enumerate(newsletters, 1):
-            newsletter_lines += (
-                f"\n  {i}. [{nl['persona']}] {nl['subject_line']}"
-            )
+            persona = nl.get("persona") or nl.get("persona_id", "")
+            subject = nl.get("subject_line", "")
+            eid = nl.get("hubspot_email_id")
+            id_part = ""
+            if eid is not None and str(eid) not in ("", "error", "None"):
+                id_part = f" | Newsletter ID: {eid}"
+            newsletter_lines += f"\n  {i}. [{persona}] {subject}{id_part}"
     else:
         newsletter_lines = "\n  Newsletters sent to 3 persona segments."
 
@@ -198,6 +206,73 @@ def log_campaign_to_crm(
 
 
 MARKETING_EMAILS_URL = f"{config.HUBSPOT_BASE_URL}/marketing/v3/emails/"
+MARKETING_STATS_URL = f"{config.HUBSPOT_BASE_URL}/marketing/emails/2026-03/statistics/list"
+
+
+def fetch_email_statistics(email_ids: list[str]) -> dict[str, dict]:
+    """Fetch real performance stats from HubSpot for the given marketing email IDs.
+
+    Returns a dict keyed by email ID, each containing counters and ratios:
+        {
+            "334783443698": {
+                "sent": 5, "delivered": 5, "opens": 3, "clicks": 1,
+                "unsubscribes": 0, "bounces": 0,
+                "open_rate": 0.6, "click_rate": 0.2, "unsubscribe_rate": 0.0,
+                "bounce_rate": 0.0,
+            },
+            ...
+        }
+    """
+    start_ts = "2026-01-01T00:00:00Z"
+    end_ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    results: dict[str, dict] = {}
+    for eid in email_ids:
+        url = (
+            f"{MARKETING_STATS_URL}"
+            f"?emailIds={eid}"
+            f"&startTimestamp={start_ts}"
+            f"&endTimestamp={end_ts}"
+        )
+        data = _make_request("GET", url)
+        if "error" in data:
+            print(f"  [Stats] Could not fetch stats for email {eid}: {data.get('error', '')}")
+            results[str(eid)] = _empty_stats()
+            continue
+
+        agg = data.get("aggregate", {})
+        counters = agg.get("counters", {})
+        ratios = agg.get("ratios", {})
+
+        sent = counters.get("sent", 0)
+        delivered = counters.get("delivered", 0)
+        opens = counters.get("open", 0)
+        clicks = counters.get("click", 0)
+        unsubscribes = counters.get("unsubscribed", 0)
+        bounces = counters.get("bounce", 0)
+
+        results[str(eid)] = {
+            "sent": sent,
+            "delivered": delivered,
+            "opens": opens,
+            "clicks": clicks,
+            "unsubscribes": unsubscribes,
+            "bounces": bounces,
+            "open_rate": ratios.get("openratio", 0.0),
+            "click_rate": ratios.get("clickratio", 0.0),
+            "unsubscribe_rate": ratios.get("unsubscribedratio", 0.0),
+            "bounce_rate": ratios.get("bounceratio", 0.0),
+        }
+    return results
+
+
+def _empty_stats() -> dict:
+    return {
+        "sent": 0, "delivered": 0, "opens": 0, "clicks": 0,
+        "unsubscribes": 0, "bounces": 0,
+        "open_rate": 0.0, "click_rate": 0.0,
+        "unsubscribe_rate": 0.0, "bounce_rate": 0.0,
+    }
 
 PERSONA_LIST_IDS = {
     "creative_professionals": 12,

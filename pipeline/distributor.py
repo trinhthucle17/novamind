@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from models.content import Newsletter
-from pipeline.crm_manager import get_contacts_by_persona, log_campaign_to_crm
+from pipeline.crm_manager import get_contacts_by_persona
 
 
 def send_newsletters(
@@ -44,20 +44,10 @@ def send_newsletters(
             "subject_line": newsletter.subject_line,
         })
 
-    newsletter_details = [
-        {"persona": nl.persona_id, "subject_line": nl.subject_line}
-        for nl in newsletters
-    ]
-    crm_result = log_campaign_to_crm(
-        campaign_id, blog_title, send_date, newsletters=newsletter_details,
-    )
-    print(f"  Campaign logged to CRM: {campaign_id}")
-
     return {
         "campaign_id": campaign_id,
         "total_sent": total_sent,
         "send_date": send_date,
         "segments": segments,
         "send_log": send_log,
-        "crm_logged": "error" not in crm_result,
     }

@@ -1,264 +1,155 @@
 # NovaMind — AI-Powered Marketing Content Pipeline
 
-An automated marketing pipeline that generates, distributes, and optimizes blog and newsletter content using AI and CRM integrations. Built for **NovaMind**, a fictional early-stage AI startup helping small creative agencies automate their daily workflows.
+Automated pipeline for **NovaMind**, a fictional AI product for small creative agencies: turn a blog topic into a draft, human-approved content, HubSpot marketing email assets, local campaign artifacts, and analytics summaries.
 
 ---
 
-## Table of Contents
+## Architecture overview
 
-- [Architecture Overview](#architecture-overview)
-- [Pipeline Flow](#pipeline-flow)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Target Personas](#target-personas)
-- [API Endpoints](#api-endpoints)
-- [Performance Analytics](#performance-analytics)
-- [Assumptions & Design Decisions](#assumptions--design-decisions)
+NovaMind is a **Python** application with three surfaces (CLI, REST API, Streamlit UI) over a shared **orchestration layer**. Content is generated with **OpenAI**, contacts and marketing emails are managed through **HubSpot’s HTTP APIs** (via `httpx`), and campaign state lives in **SQLite** plus **Markdown/JSON** files under `data/` (gitignored).
 
----
-
-## Architecture Overview
+### System diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        NovaMind Pipeline                            │
-│                                                                     │
-│  ┌──────────┐    ┌──────────────┐    ┌──────────┐    ┌───────────┐ │
-│  │  Topic    │───▶│ AI Content   │───▶│ CRM &    │───▶│ Analytics │ │
-│  │  Input    │    │ Generation   │    │ Delivery │    │ & Logging │ │
-│  └──────────┘    └──────────────┘    └──────────┘    └───────────┘ │
-│       │               │                   │                │       │
-│       │          OpenAI API          HubSpot API      Feedback     │
-│       │               │                   │             Loop       │
-│       └───────────────┴───────────────────┴───────────────┘       │
-│                         Optimization Loop                          │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           NovaMind                                       │
+│  ┌─────────────┐   ┌──────────────────┐   ┌────────────┐   ┌─────────┐ │
+│  │ CLI / API / │   │   Orchestrator    │   │  Storage   │   │  data/  │ │
+│  │  Dashboard  │──▶│ content → CRM →   │──▶│  SQLite +  │──▶│  files  │ │
+│  │             │   │ distribute → KPIs │   │  file I/O  │   │         │ │
+│  └─────────────┘   └─────────┬────────┘   └────────────┘   └─────────┘ │
+│                              │                                           │
+│                    OpenAI (gpt-4o)     HubSpot CRM / Marketing Email    │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-The pipeline operates in four stages:
-
-1. **Ingestion** — Accept a blog topic and optional parameters.
-2. **Generation** — Produce a blog draft and three persona-targeted newsletter variants via LLM.
-3. **Distribution** — Sync contacts to HubSpot, segment by persona, and send personalized newsletters.
-4. **Analysis** — Collect engagement metrics, generate AI-powered performance summaries, and feed insights back into future content.
-
----
-
-## Pipeline Flow
+### End-to-end flow
 
 ```mermaid
 flowchart TD
-    A[Topic Input] --> B[AI Content Generation]
-    B --> C[Blog Post Draft]
-    B --> D[Newsletter — Creative Professionals]
-    B --> E[Newsletter — Startup Founders]
-    B --> F[Newsletter — Agency Operators]
+    subgraph inputs [Entry points]
+        CLI[main.py CLI]
+        API[FastAPI app.py]
+        UI[Streamlit dashboard.py]
+    end
 
-    C --> G[Store as Markdown/JSON]
-    D --> H[HubSpot: Segment & Send]
-    E --> H
-    F --> H
+    subgraph gen [Generation]
+        T[Topic] --> Draft[generate_campaign_draft]
+        Draft --> Final[finalize_campaign_after_review]
+        Draft -.->|optional: Streamlit edit before approve| Final
+    end
 
-    H --> I[Log Campaign to CRM]
-    I --> J[Fetch Engagement Metrics]
-    J --> K[AI Performance Summary]
-    K --> L{Optimize?}
-    L -->|Yes| M[Suggest Next Topics & Headlines]
-    M --> A
-    L -->|No| N[Archive Report]
+    subgraph delivery [Delivery and CRM]
+        Final --> Files[Save blog MD + newsletters + campaign JSON]
+        Final --> HS_Sync[Sync contacts to HubSpot]
+        HS_Sync --> Dist[send_newsletters — simulated per-recipient log]
+        Dist --> HS_Email[create_marketing_email per persona]
+        HS_Email --> Note[log_campaign_to_crm]
+    end
+
+    subgraph analytics [Analytics]
+        Note --> Post[run_post_send_analytics optional]
+        Post --> Sim[simulate_engagement]
+        Sim --> Sum[generate_performance_summary]
+        Sum --> Topics[topic suggestions]
+    end
+
+    CLI --> T
+    API --> T
+    UI --> T
 ```
 
----
+**Stages in plain language**
 
-## Features
-
-### Core
-
-- **AI Content Generation** — Generates a blog outline, a 400–600 word draft, and three persona-customized newsletter variants from a single topic input.
-- **CRM Integration** — Creates/updates contacts in HubSpot, segments by persona, and distributes the correct newsletter version to each segment.
-- **Campaign Logging** — Records blog title, newsletter ID, send date, and persona mapping to HubSpot for every campaign.
-- **Performance Analysis** — Fetches (or simulates) open rate, click rate, and unsubscribe rate per persona; stores historical data; generates AI-powered summaries with actionable recommendations.
-
-### Bonus
-
-- **AI-Driven Optimization** — Suggests next blog topics and headline variations based on engagement trends.
-- **Revision Workflow** — Generates multiple copy options per newsletter with the ability to request AI revisions.
-- **Web Dashboard** — Simple UI to trigger the pipeline, view generated content, and browse analytics.
+1. **Draft** — LLM produces a blog post and three persona-specific newsletters; state is stored as `awaiting_review`.
+2. **Finalize** — `run_pipeline` (CLI and `POST /pipeline/run`) finalizes **immediately** after the draft. **Streamlit** can hold the draft until you edit and approve. Finalization saves files, syncs `data/contacts.json` into HubSpot, records a **simulated** send manifest (recipient counts and log lines), creates **real** HubSpot marketing email objects (HTML from newsletter bodies), and logs the campaign on the CRM timeline.
+3. **Analytics** — Persona-level engagement for the default path is **simulated** and stored; an LLM may **rewrite** a fact-grounded summary under strict guardrails. Optional **`python main.py --stats`** pulls **live** HubSpot email statistics when the campaign JSON includes `hubspot_emails` IDs.
 
 ---
 
-## Tech Stack
+## Tools, APIs, and models
 
-| Layer              | Technology                          |
-| ------------------ | ----------------------------------- |
-| Language           | Python 3.11+                        |
-| AI / LLM           | OpenAI API (`gpt-4o`)              |
-| CRM                | HubSpot API (free developer account)|
-| Web Framework      | FastAPI                             |
-| Frontend Dashboard | Streamlit                           |
-| Data Storage       | SQLite (local) / JSON flat files    |
-| Task Orchestration | Python `asyncio`                    |
-| Testing            | pytest                              |
-
----
-
-## Project Structure
-
-```
-novamind/
-├── README.md
-├── requirements.txt
-├── .env.example
-├── config.py                  # Central configuration & env loading
-├── main.py                    # CLI entrypoint for the pipeline
-├── app.py                     # FastAPI server (API endpoints)
-├── dashboard.py               # Streamlit dashboard
-│
-├── pipeline/
-│   ├── __init__.py
-│   ├── orchestrator.py        # End-to-end pipeline coordination
-│   ├── content_generator.py   # LLM-powered blog & newsletter generation
-│   ├── crm_manager.py         # HubSpot contact & campaign management
-│   ├── distributor.py         # Newsletter sending logic
-│   └── analytics.py           # Metrics collection & AI summaries
-│
-├── models/
-│   ├── __init__.py
-│   ├── content.py             # Blog, Newsletter, Campaign data models
-│   └── metrics.py             # Performance metric schemas
-│
-├── storage/
-│   ├── __init__.py
-│   ├── database.py            # SQLite persistence layer
-│   └── file_store.py          # Markdown/JSON file output
-│
-├── data/
-│   ├── contacts.json          # Mock contact list
-│   ├── campaigns/             # Generated campaign logs
-│   └── content/               # Generated blog & newsletter files
-│
-├── tests/
-│   ├── test_content_generator.py
-│   ├── test_crm_manager.py
-│   ├── test_distributor.py
-│   └── test_analytics.py
-│
-└── docs/
-    └── architecture.md        # Detailed design document
-```
+| Area | Choice |
+|------|--------|
+| **Language** | Python (3.10+ recommended; 3.9 may work) |
+| **LLM** | OpenAI API, model `gpt-4o` (`config.LLM_MODEL`) for blog, newsletters, hero image prompt path, and optional summary tone |
+| **CRM / email assets** | HubSpot REST API (`https://api.hubapi.com`), private app token in `HUBSPOT_API_KEY` |
+| **HTTP client** | `httpx` (HubSpot calls in `pipeline/crm_manager.py`) |
+| **API server** | FastAPI + Uvicorn (`app.py`) |
+| **Dashboard** | Streamlit + Plotly (`dashboard.py`) |
+| **Data models** | Pydantic v2 (`models/content.py`, `models/metrics.py`) |
+| **Persistence** | `aiosqlite` / SQLite URL from `DATABASE_URL`; Markdown and JSON via `storage/file_store.py` |
+| **Dependencies** | See `requirements.txt` (includes `hubspot-api-client`; HubSpot integration in-repo is primarily `httpx`-based) |
+| **Tests** | `pytest` |
 
 ---
 
-## Getting Started
+## Assumptions and simulated behavior
+
+| Topic | What the repo actually does |
+|--------|-----------------------------|
+| **Audience data** | Contacts are loaded from **`data/contacts.json`** (curated mock list), not a live CRM import. Sync pushes them to HubSpot for segmentation experiments. |
+| **“Sending” newsletters** | `pipeline/distributor.send_newsletters` does **not** call a bulk transactional send API. It builds a **simulated** send log and segment recipient counts from persona membership — suitable for demos and tests. |
+| **HubSpot marketing emails** | The pipeline **creates** marketing email objects in HubSpot (`create_marketing_email`) so IDs can be stored and used for reporting; real opens/clicks depend on your HubSpot setup and sends. |
+| **Default campaign metrics** | After send, `run_post_send_analytics` uses **`simulate_engagement`** (randomized ranges per persona) when metrics are missing — not live HubSpot analytics. |
+| **`METRICS_SIMULATION` in `config.py`** | Present as a flag; the main orchestration path uses simulation for stored KPIs unless you use the **CLI stats** path below. |
+| **Live HubSpot stats** | `python main.py --stats <campaign_id>` calls **`fetch_hubspot_metrics`** when the campaign JSON includes **`hubspot_emails`** with valid IDs. |
+| **API security** | Local FastAPI app has **no authentication** — development use only. |
+| **Topic recommendations** | Dashboard can build recommendations via `pipeline/topic_recommendations.py` (analytics-driven helpers); `/suggestions/topics` uses a lightweight `suggest_topics` path over recent campaign metadata. |
+
+---
+
+## Run locally
 
 ### Prerequisites
 
-- Python 3.11 or higher
-- An [OpenAI API key](https://platform.openai.com/api-keys)
-- A [HubSpot developer account](https://developers.hubspot.com/) (free tier works)
+- Python **3.10+** (3.9 may work)
+- [OpenAI API key](https://platform.openai.com/api-keys)
+- [HubSpot private app](https://developers.hubspot.com/) token with contacts and marketing email scopes as needed for your tests
 
-### Installation
+### Setup
 
 ```bash
-# Clone the repository
 git clone https://github.com/trinhthucle17/novamind.git
 cd novamind
-
-# Create and activate a virtual environment
 python -m venv venv
-source venv/bin/activate        # macOS/Linux
-# venv\Scripts\activate         # Windows
-
-# Install dependencies
+source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your API keys
 ```
 
-### Environment Variables
+### Environment variables
 
-Create a `.env` file in the project root:
+Create a **`.env`** file in the project root (this repo does not ship `.env.example`):
 
 ```env
-OPENAI_API_KEY=your-openai-api-key
-HUBSPOT_API_KEY=your-hubspot-api-key
+OPENAI_API_KEY=sk-...
+HUBSPOT_API_KEY=pat-na1-...
 DATABASE_URL=sqlite:///novamind.db
 ```
 
----
+### Commands
 
-## Configuration
+| Goal | Command |
+|------|---------|
+| Full pipeline (draft → finalize in one shot) | `python main.py --topic "Your blog topic"` |
+| HubSpot email stats for a campaign | `python main.py --stats camp_YYYYMMDD_HHMMSS` |
+| With historical comparison | `python main.py --stats camp_YYYYMMDD_HHMMSS --history` |
+| REST API | `uvicorn app:app --reload --port 8000` |
+| Streamlit UI | `streamlit run dashboard.py` |
+| Tests | `pytest` |
 
-All configurable parameters live in `config.py`:
+### API endpoints (`app.py`)
 
-| Parameter               | Default                | Description                                    |
-| ----------------------- | ---------------------- | ---------------------------------------------- |
-| `LLM_MODEL`             | `gpt-4o`              | OpenAI model for content generation            |
-| `BLOG_WORD_COUNT`        | `500`                 | Target word count for blog drafts              |
-| `NEWSLETTER_VARIANTS`    | `3`                   | Number of persona-targeted newsletter versions |
-| `HUBSPOT_BASE_URL`       | HubSpot API v3 URL    | CRM API base URL                               |
-| `METRICS_SIMULATION`     | `True`                | Use simulated metrics when no live data exists |
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/` | Health / service name |
+| `POST` | `/pipeline/run` | JSON body `{"topic": "..."}` — run full pipeline |
+| `GET` | `/campaigns` | List campaigns from SQLite |
+| `GET` | `/content/{campaign_id}` | One campaign record |
+| `GET` | `/analytics/{campaign_id}` | Metrics + AI summary |
+| `GET` | `/suggestions/topics` | Suggested next topics from recent campaigns |
 
----
-
-## Usage
-
-### Run the Full Pipeline (CLI)
-
-```bash
-python main.py --topic "AI in creative automation"
-```
-
-This will:
-1. Generate a blog post draft and three newsletter variants.
-2. Sync contacts and segment by persona in HubSpot.
-3. Send the appropriate newsletter to each segment.
-4. Collect engagement metrics and produce an AI performance summary.
-
-### Run the API Server
-
-```bash
-uvicorn app:app --reload --port 8000
-```
-
-### Launch the Dashboard
-
-```bash
-streamlit run dashboard.py
-```
-
----
-
-## Target Personas
-
-The pipeline segments audiences into three personas, each receiving a tailored newsletter:
-
-| Persona                   | Description                                                                 | Newsletter Tone                    |
-| ------------------------- | --------------------------------------------------------------------------- | ---------------------------------- |
-| **Creative Professionals** | Freelance designers, writers, and video editors looking to save time.       | Inspirational, tool-focused        |
-| **Startup Founders**       | Early-stage founders seeking to scale operations without hiring.            | ROI-driven, concise, data-backed   |
-| **Agency Operators**       | Small agency owners managing multiple client workflows.                     | Practical, workflow-oriented       |
-
----
-
-## API Endpoints
-
-| Method | Endpoint                     | Description                              |
-| ------ | ---------------------------- | ---------------------------------------- |
-| POST   | `/pipeline/run`              | Trigger the full pipeline with a topic   |
-| GET    | `/content/{campaign_id}`     | Retrieve generated content for a campaign|
-| GET    | `/campaigns`                 | List all campaigns                       |
-| GET    | `/analytics/{campaign_id}`   | Get performance metrics for a campaign   |
-| POST   | `/content/revise`            | Request AI revision of a newsletter draft|
-| GET    | `/suggestions/topics`        | Get AI-suggested next blog topics        |
-
-### Example: Trigger the Pipeline
+Example:
 
 ```bash
 curl -X POST http://localhost:8000/pipeline/run \
@@ -266,78 +157,30 @@ curl -X POST http://localhost:8000/pipeline/run \
   -d '{"topic": "AI in creative automation"}'
 ```
 
-**Response:**
+### Project layout (high level)
 
-```json
-{
-  "campaign_id": "camp_20260414_001",
-  "blog": {
-    "title": "How AI Is Reshaping Creative Automation in 2026",
-    "word_count": 523,
-    "file": "data/content/blog_20260414.md"
-  },
-  "newsletters": [
-    {
-      "persona": "creative_professionals",
-      "subject_line": "Your Creative Workflow, Supercharged by AI",
-      "status": "sent"
-    },
-    {
-      "persona": "startup_founders",
-      "subject_line": "Cut Costs, Not Corners: AI Automation for Lean Teams",
-      "status": "sent"
-    },
-    {
-      "persona": "agency_operators",
-      "subject_line": "Run Your Agency on Autopilot with AI Workflows",
-      "status": "sent"
-    }
-  ],
-  "contacts_synced": 150,
-  "campaign_logged": true
-}
+```
+novamind/
+├── main.py                 # CLI
+├── app.py                  # FastAPI
+├── dashboard.py            # Streamlit
+├── config.py               # Env + personas + model name
+├── pipeline/               # orchestrator, content, CRM, distributor, analytics, topic_recommendations
+├── models/                 # Pydantic schemas
+├── storage/                # SQLite + file store
+├── data/contacts.json      # Mock contacts (tracked)
+├── data/campaigns/         # Generated JSON (gitignored)
+├── data/content/           # Generated markdown (gitignored)
+├── tests/
+└── docs/architecture.md    # Deeper design notes
 ```
 
----
+### Personas (newsletter variants)
 
-## Performance Analytics
-
-After each campaign, the system collects and analyzes:
-
-| Metric            | Description                                |
-| ----------------- | ------------------------------------------ |
-| Open Rate         | Percentage of recipients who opened        |
-| Click Rate        | Percentage who clicked a link              |
-| Unsubscribe Rate  | Percentage who unsubscribed                |
-| Conversion Rate   | Percentage who completed a target action   |
-
-### AI-Generated Summary Example
-
-> **Campaign: "AI in Creative Automation" — Performance Summary**
->
-> Creative Professionals had a 12% higher click rate than other segments, driven by the visual case study in the CTA section. Startup Founders showed strong open rates (42%) but lower engagement — consider shorter copy with inline metrics. Agency Operators had the lowest unsubscribe rate (0.3%), suggesting strong content-audience fit.
->
-> **Recommendations:**
-> - Next topic: "5 Automation Workflows Every Small Agency Needs in 2026"
-> - A/B test shorter subject lines for the Startup Founders segment
-> - Add more visual assets to the Creative Professionals variant
-
----
-
-## Assumptions & Design Decisions
-
-| Area                  | Decision                                                                                                  |
-| --------------------- | --------------------------------------------------------------------------------------------------------- |
-| **CRM Data**          | Mock contacts are used via `data/contacts.json`. In production, these would sync from a live HubSpot CRM. |
-| **Email Delivery**    | Newsletters are sent through HubSpot's transactional email API. In dev mode, sends are simulated and logged locally. |
-| **Metrics**           | Engagement data is simulated with realistic distributions when live HubSpot analytics aren't available.   |
-| **LLM Provider**      | OpenAI is used by default; the `content_generator.py` module is provider-agnostic and can be swapped for Claude or Gemini. |
-| **Storage**           | SQLite for structured campaign/metric data; Markdown and JSON files for generated content. No external database required. |
-| **Authentication**    | API keys are loaded from environment variables. The local API server does not enforce auth (dev-only).    |
-| **Rate Limiting**     | Basic retry logic with exponential backoff is applied to all external API calls.                          |
+Three segments defined in `config.py`: **Creative Professionals**, **Brand Strategists**, and **Account Managers** — each gets its own newsletter voice and format rules.
 
 ---
 
 ## License
 
-This project is developed as a take-home assessment and is not intended for production use.
+Built as a portfolio / assessment-style project; not intended as production software without hardening (auth, secrets management, real send semantics, and observability).

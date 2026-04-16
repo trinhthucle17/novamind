@@ -52,6 +52,26 @@ def init_db():
             created_at TEXT,
             FOREIGN KEY (campaign_id) REFERENCES campaigns(campaign_id)
         );
+
+        CREATE TABLE IF NOT EXISTS hubspot_email_stats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id TEXT NOT NULL,
+            hubspot_email_id TEXT NOT NULL,
+            persona_id TEXT NOT NULL,
+            persona_name TEXT,
+            sent INTEGER DEFAULT 0,
+            delivered INTEGER DEFAULT 0,
+            opens INTEGER DEFAULT 0,
+            clicks INTEGER DEFAULT 0,
+            unsubscribes INTEGER DEFAULT 0,
+            bounces INTEGER DEFAULT 0,
+            open_rate REAL DEFAULT 0.0,
+            click_rate REAL DEFAULT 0.0,
+            unsubscribe_rate REAL DEFAULT 0.0,
+            bounce_rate REAL DEFAULT 0.0,
+            fetched_at TEXT,
+            FOREIGN KEY (campaign_id) REFERENCES campaigns(campaign_id)
+        );
     """)
     conn.commit()
     conn.close()
@@ -174,6 +194,86 @@ def get_ai_summary(campaign_id: str) -> dict | None:
     d = dict(row)
     d["suggested_topics"] = json.loads(d.get("suggested_topics") or "[]")
     return d
+
+
+def save_hubspot_stats(stats_list: list[dict]):
+    """Save fetched HubSpot email statistics for historical tracking."""
+    conn = _get_conn()
+    now = datetime.utcnow().isoformat()
+    for s in stats_list:
+        conn.execute(
+            """INSERT INTO hubspot_email_stats
+               (campaign_id, hubspot_email_id, persona_id, persona_name,
+                sent, delivered, opens, clicks, unsubscribes, bounces,
+                open_rate, click_rate, unsubscribe_rate, bounce_rate, fetched_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                s["campaign_id"],
+                s["hubspot_email_id"],
+                s["persona_id"],
+                s.get("persona_name", ""),
+                s.get("sent", 0),
+                s.get("delivered", 0),
+                s.get("opens", 0),
+                s.get("clicks", 0),
+                s.get("unsubscribes", 0),
+                s.get("bounces", 0),
+                s.get("open_rate", 0.0),
+                s.get("click_rate", 0.0),
+                s.get("unsubscribe_rate", 0.0),
+                s.get("bounce_rate", 0.0),
+                s.get("fetched_at", now),
+            ),
+        )
+    conn.commit()
+    conn.close()
+
+
+def get_hubspot_stats(campaign_id: str | None = None) -> list[dict]:
+    """Return HubSpot email stats, optionally filtered by campaign.
+    Returns all snapshots for historical comparison.
+    """
+    conn = _get_conn()
+    if campaign_id:
+        rows = conn.execute(
+            """SELECT * FROM hubspot_email_stats
+               WHERE campaign_id = ? ORDER BY fetched_at DESC""",
+            (campaign_id,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM hubspot_email_stats ORDER BY fetched_at DESC"
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_hubspot_stats_latest(campaign_id: str) -> list[dict]:
+    """Return only the most recent fetch for each persona in a campaign."""
+    conn = _get_conn()
+    rows = conn.execute(
+        """SELECT * FROM hubspot_email_stats
+           WHERE campaign_id = ?
+           AND fetched_at = (
+               SELECT MAX(fetched_at) FROM hubspot_email_stats
+               WHERE campaign_id = ?
+           )
+           ORDER BY persona_id""",
+        (campaign_id, campaign_id),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def delete_campaign(campaign_id: str):
+    """Delete a campaign and all associated records from the database."""
+    conn = _get_conn()
+    conn.execute("DELETE FROM metrics WHERE campaign_id = ?", (campaign_id,))
+    conn.execute("DELETE FROM ai_summaries WHERE campaign_id = ?", (campaign_id,))
+    conn.execute("DELETE FROM hubspot_email_stats WHERE campaign_id = ?", (campaign_id,))
+    conn.execute("DELETE FROM campaigns WHERE campaign_id = ?", (campaign_id,))
+    conn.commit()
+    conn.close()
 
 
 def get_historical_metrics() -> list[dict]:
